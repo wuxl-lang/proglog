@@ -11,15 +11,18 @@ func NewHttpServer(addr string) *http.Server {
 	httpsrv := newHTTPServer()
 	r := mux.NewRouter()
 
+	// register handle
 	r.HandleFunc("/", httpsrv.handleProduce).Methods("POST")
 	r.HandleFunc("/", httpsrv.handleConsume).Methods("GET")
 
+	// Set up HTTP Sever
 	return &http.Server{
 		Addr:    addr,
 		Handler: r,
 	}
 }
 
+// A server holds Log
 type httpServer struct {
 	Log *Log
 }
@@ -47,6 +50,7 @@ type ConsumeResponse struct {
 }
 
 func (s *httpServer) handleProduce(w http.ResponseWriter, r *http.Request) {
+	// Unmarshal request
 	var req ProduceRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -55,11 +59,13 @@ func (s *httpServer) handleProduce(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Append record
 	offset, err := s.Log.Append(req.Record)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
+	// Marshal response
 	var res = ProduceResponse{Offset: offset}
 	err = json.NewEncoder(w).Encode(res)
 	if err != nil {
@@ -70,6 +76,7 @@ func (s *httpServer) handleProduce(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *httpServer) handleConsume(w http.ResponseWriter, r *http.Request) {
+	// Unmarshal request
 	var req ConsumeRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -78,13 +85,20 @@ func (s *httpServer) handleConsume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Read record in Log
 	record, err := s.Log.Read(req.Offset)
-	if err != nil {
+	if err == ErrOffsetNotFound { // It should be bad request
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+	if err != nil { // Otherwise,
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 
 		return
 	}
 
+	// Marshal response
 	var res = ConsumeResponse{Record: record}
 	err = json.NewEncoder(w).Encode(res)
 	if err != nil {
