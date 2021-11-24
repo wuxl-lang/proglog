@@ -8,8 +8,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 	api "github.com/wuxl-lang/proglog/api/v1"
+	"github.com/wuxl-lang/proglog/config"
 	"github.com/wuxl-lang/proglog/internal/log"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 )
 
@@ -136,7 +138,7 @@ func setupTest(t *testing.T) (client api.LogClient, cfg *Config, teardown func()
 	t.Helper()
 
 	// Set up listener
-	l, err := net.Listen("tcp", ":0")
+	l, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
 	// Set up Log
@@ -151,7 +153,18 @@ func setupTest(t *testing.T) (client api.LogClient, cfg *Config, teardown func()
 	}
 
 	// Set up server
-	server, err := NewGRPCServer(cfg)
+	serverTLSConfig, err := config.SetupTLSConfig(config.TLSConfig{
+		CertFile:      config.ServerCertFile,
+		KeyFile:       config.ServerKeyFile,
+		CAFile:        config.CAFile,
+		ServerAddress: l.Addr().String(),
+		Server:        true,
+	})
+	require.NoError(t, err)
+
+	serverCreds := credentials.NewTLS(serverTLSConfig)
+
+	server, err := NewGRPCServer(cfg, grpc.Creds(serverCreds))
 	require.NoError(t, err)
 
 	go func() {
@@ -159,8 +172,18 @@ func setupTest(t *testing.T) (client api.LogClient, cfg *Config, teardown func()
 	}()
 
 	// Set up client
-	clientOptions := []grpc.DialOption{grpc.WithInsecure()}
-	cc, err := grpc.Dial(l.Addr().String(), clientOptions...)
+	// Config client's TLS credentialls with CA as client's Root CA, which will use to verify the server.
+	clientTLSConfig, err := config.SetupTLSConfig(config.TLSConfig{
+		CertFile: config.ClientCertFile,
+		KeyFile:  config.ClientKeyFile,
+		CAFile:   config.CAFile,
+	})
+	require.NoError(t, err)
+
+	clientCreds := credentials.NewTLS(clientTLSConfig)
+
+	// Use credentials for connection
+	cc, err := grpc.Dial(l.Addr().String(), grpc.WithTransportCredentials(clientCreds))
 	require.NoError(t, err)
 
 	client = api.NewLogClient(cc)
