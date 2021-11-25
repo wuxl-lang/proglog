@@ -155,7 +155,7 @@ func setupTest(t *testing.T) (client api.LogClient, cfg *Config, teardown func()
 	// Set up server
 	serverTLSConfig, err := config.SetupTLSConfig(config.TLSConfig{
 		CertFile:      config.ServerCertFile,
-		KeyFile:       config.ServerKeyFile,
+		KeyFile:       config.ServerKeyFile, // CerFile and KeyFile is set to allow client to verify
 		CAFile:        config.CAFile,
 		ServerAddress: l.Addr().String(),
 		Server:        true,
@@ -175,7 +175,7 @@ func setupTest(t *testing.T) (client api.LogClient, cfg *Config, teardown func()
 	// Config client's TLS credentialls with CA as client's Root CA, which will use to verify the server.
 	clientTLSConfig, err := config.SetupTLSConfig(config.TLSConfig{
 		CertFile: config.ClientCertFile,
-		KeyFile:  config.ClientKeyFile,
+		KeyFile:  config.ClientKeyFile, // CerFile and KeyFile is set to allow server to verify
 		CAFile:   config.CAFile,
 	})
 	require.NoError(t, err)

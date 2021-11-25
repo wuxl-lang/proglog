@@ -20,6 +20,8 @@ func SetupTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 	tlsConfig := &tls.Config{}
 
 	if cfg.CertFile != "" && cfg.KeyFile != "" {
+		// Set client config to allow server to verify
+		// Set server config to allow client to verify
 		tlsConfig.Certificates = make([]tls.Certificate, 1)
 		tlsConfig.Certificates[0], err = tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
 		if err != nil {
@@ -40,9 +42,11 @@ func SetupTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 		}
 
 		if cfg.Server {
+			// Verify client's certificate
 			tlsConfig.ClientCAs = ca
 			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 		} else {
+			// Verify server's certificate
 			tlsConfig.RootCAs = ca
 		}
 
